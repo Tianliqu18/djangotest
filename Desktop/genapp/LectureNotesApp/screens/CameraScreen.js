@@ -28,6 +28,7 @@ export default function CameraScreen({ navigation }) {
   const [documentName, setDocumentName] = useState('');
   const [processing, setProcessing] = useState(false);
   const [cameraReady, setCameraReady] = useState(false);
+  const [showPhotoGallery, setShowPhotoGallery] = useState(false);
   const cameraRef = useRef(null);
 
   useEffect(() => {
@@ -154,7 +155,7 @@ export default function CameraScreen({ navigation }) {
 
       // Launch image picker with multiple selection
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        mediaTypes: ['images'],
         allowsMultipleSelection: true,
         quality: 0.8,
       });
@@ -235,6 +236,42 @@ export default function CameraScreen({ navigation }) {
         </View>
       </Modal>
 
+      {/* Photo Gallery Modal */}
+      <Modal visible={showPhotoGallery} animationType="slide" transparent={true}>
+        <View style={styles.galleryModalContainer}>
+          <View style={styles.galleryModalContent}>
+            <View style={styles.galleryHeader}>
+              <Text style={styles.galleryTitle}>{photos.length} Photos</Text>
+              <TouchableOpacity onPress={() => setShowPhotoGallery(false)}>
+                <Ionicons name="close" size={28} color={COLORS.textPrimary} />
+              </TouchableOpacity>
+            </View>
+            <FlatList
+              data={photos}
+              keyExtractor={(item, index) => index.toString()}
+              numColumns={3}
+              renderItem={({ item, index }) => (
+                <View style={styles.galleryItem}>
+                  <Image source={{ uri: item.uri }} style={styles.galleryImage} />
+                  <TouchableOpacity
+                    style={styles.deleteGalleryPhoto}
+                    onPress={() => {
+                      deletePhoto(index);
+                      if (photos.length === 1) {
+                        setShowPhotoGallery(false);
+                      }
+                    }}
+                  >
+                    <Ionicons name="trash" size={20} color={COLORS.background} />
+                  </TouchableOpacity>
+                </View>
+              )}
+              contentContainerStyle={styles.galleryGrid}
+            />
+          </View>
+        </View>
+      </Modal>
+
       {/* Camera View */}
       <CameraView
         style={styles.camera}
@@ -249,27 +286,34 @@ export default function CameraScreen({ navigation }) {
           <Text style={styles.photoCount}>{photos.length} photos</Text>
         </View>
 
-        {/* Photo Thumbnails */}
+        {/* Photo Stack Preview (Top Left) */}
         {photos.length > 0 && (
-          <View style={styles.thumbnailContainer}>
-            <FlatList
-              horizontal
-              data={photos}
-              keyExtractor={(item, index) => index.toString()}
-              renderItem={({ item, index }) => (
-                <View style={styles.thumbnail}>
-                  <Image source={{ uri: item.uri }} style={styles.thumbnailImage} />
-                  <TouchableOpacity
-                    style={styles.deleteThumbnail}
-                    onPress={() => deletePhoto(index)}
-                  >
-                    <Ionicons name="close-circle" size={24} color={COLORS.error} />
-                  </TouchableOpacity>
-                </View>
-              )}
-              showsHorizontalScrollIndicator={false}
-            />
-          </View>
+          <TouchableOpacity
+            style={styles.photoStack}
+            onPress={() => setShowPhotoGallery(true)}
+            activeOpacity={0.8}
+          >
+            {/* Show up to 3 photos in stack */}
+            {photos.slice(0, Math.min(3, photos.length)).map((photo, index) => (
+              <View
+                key={index}
+                style={[
+                  styles.stackedPhoto,
+                  {
+                    top: index * 4,
+                    left: index * 4,
+                    zIndex: 3 - index,
+                  },
+                ]}
+              >
+                <Image source={{ uri: photo.uri }} style={styles.stackedPhotoImage} />
+              </View>
+            ))}
+            {/* Photo count badge */}
+            <View style={styles.photoCountBadge}>
+              <Text style={styles.photoCountBadgeText}>{photos.length}</Text>
+            </View>
+          </TouchableOpacity>
         )}
 
         {/* Bottom Controls */}
@@ -357,30 +401,107 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: 16,
   },
-  thumbnailContainer: {
+  photoStack: {
     position: 'absolute',
-    top: 120,
-    left: 0,
-    right: 0,
-    paddingHorizontal: 10,
+    top: 100,
+    left: 20,
+    width: 100,
+    height: 100,
   },
-  thumbnail: {
-    marginHorizontal: 5,
-    position: 'relative',
-  },
-  thumbnailImage: {
-    width: 80,
-    height: 80,
-    borderRadius: 8,
-    borderWidth: 2,
+  stackedPhoto: {
+    position: 'absolute',
+    width: 90,
+    height: 90,
+    borderRadius: 12,
+    borderWidth: 3,
     borderColor: COLORS.background,
+    backgroundColor: COLORS.background,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 5,
   },
-  deleteThumbnail: {
+  stackedPhotoImage: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 9,
+  },
+  photoCountBadge: {
     position: 'absolute',
     top: -8,
     right: -8,
+    backgroundColor: COLORS.primary,
+    borderRadius: 14,
+    minWidth: 28,
+    height: 28,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 6,
+    borderWidth: 2,
+    borderColor: COLORS.background,
+    zIndex: 10,
+  },
+  photoCountBadgeText: {
+    color: COLORS.background,
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+  galleryModalContainer: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.9)',
+    justifyContent: 'flex-end',
+  },
+  galleryModalContent: {
     backgroundColor: COLORS.background,
-    borderRadius: 12,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    maxHeight: '80%',
+    paddingTop: 20,
+  },
+  galleryHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+  },
+  galleryTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: COLORS.textPrimary,
+  },
+  galleryGrid: {
+    padding: 10,
+  },
+  galleryItem: {
+    width: (width - 40) / 3,
+    height: (width - 40) / 3,
+    padding: 5,
+    position: 'relative',
+  },
+  galleryImage: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 8,
+  },
+  deleteGalleryPhoto: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    backgroundColor: COLORS.error,
+    borderRadius: 16,
+    width: 32,
+    height: 32,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 3,
+    elevation: 5,
   },
   controls: {
     position: 'absolute',
